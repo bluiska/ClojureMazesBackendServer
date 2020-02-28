@@ -141,13 +141,13 @@
   (recursive-backtracking-maze mask (rectangle-maze r c)))
 
 (defn get-drawn-maze
-  [state]
-  (let [maze (find-route 0 0 5 5 (dijkstras (state :mask) (make-maze (state :maze-size) (state :maze-size) (state :mask)))) margin 70]
+  [maze-to-draw mask]
+  (let [maze maze-to-draw margin 70]
     (q/fill 0)
     (q/background 240)
-    (q/line margin margin (- (state :width) margin) margin)
-    (let [y-cell-size (/ (- (state :height) (* 2 margin)) (count maze))
-          x-cell-size (/ (- (state :width) (* 2 margin)) (-> maze first count))]
+    (q/line margin margin (- 750 margin) margin)
+    (let [y-cell-size (/ (- 750 (* 2 margin)) (count maze))
+          x-cell-size (/ (- 750 (* 2 margin)) (-> maze first count))]
       (dotimes [y (count maze)]
         (let [yv (+ margin (* y y-cell-size))
               yv2 (+ y-cell-size yv)]
@@ -155,12 +155,8 @@
           (dotimes [x (-> maze first count)]
             (let [xv (+ margin (* x x-cell-size))
                   xv2 (+ x-cell-size xv)]
-              ;(if (= 0 ((mget x y maze) :south) (q/line xv yv2 xv2 yv2))
-              ;(if (not= 0 ((mget x y maze) :north))
-              ;  (when (= 0 ((mget x y maze) :east) (q/line xv yv2 xv2 yv2))
-              ;  (q/line xv2 yv xv2 yv2))))
               (let [cell (get-in maze [y x])
-                    maskCell (get (get (state :mask) y) x)]
+                    maskCell (get (get mask y) x)]
                 (if (or (nil? maskCell) (= 0 maskCell)) (if (= 0 (cell :visited))
                                                           (do
                                                             (q/fill 200 255 200)
@@ -174,15 +170,13 @@
                                                           (q/fill 100 255 100)
                                                           (q/no-stroke)
                                                           (q/rect (+ 3 xv) (+ 3 yv) x-cell-size y-cell-size)
-                                                          )
-                                                        )
+                                                          ))
                 (when (= 1 (cell :path))
                   (do
                     (q/fill 200 240 0)
                     (q/no-stroke)
                     (q/rect (+ xv (/ (/ x-cell-size 2) 2)) (+ yv (/ (/ y-cell-size 2) 2)) (/ x-cell-size 2) (/ y-cell-size 2))))
 
-                (q/image (q/load-image "./mouse.jpg") 500 500)
                 (q/stroke 0)
                 (q/stroke-weight 5)
                 (q/fill 0)
@@ -193,32 +187,34 @@
                 (when (> 14 (count maze)) (q/text-size 20))
                 (when (> 14 (count maze)) (q/text (str (cell :weight)) (+ xv (/ x-cell-size 2)) (+ yv (/ y-cell-size 2))))))))))))
 
-
-(defn create-maze
-  "size: int (preferable up to 32 as the algorithm I have causes a stack overflow for now
-   mask: string (the 2d array of values where 1 will be the mask and 0 is ignored"
+(defn generate-maze
   [size mask]
+  (dijkstras mask (make-maze size size (getImageArrayFromString mask))))
+
+(defn create-maze-file
+  "maze: the 2D matrix of the maze cells
+   size: int (preferable up to 32 as the algorithm I have causes a stack overflow
+   mask: string (the 2d array of values where 1 will be the mask and 0 is ignored"
+  [maze mask]
   (let [*agnt* (agent {})]
     (send-off *agnt* (fn [state]
                        (q/sketch
                          :draw (fn []
                                  (q/do-record (q/create-graphics 750 750 :svg "test.svg")
                                               (q/no-loop)
-                                              (get-drawn-maze {:maze-size size :mask (getImageArrayFromString mask) :width 750 :height 750})
-                                              )
+                                              (get-drawn-maze maze (getImageArrayFromString mask)))
                                  (q/exit)
-
                                  ))
                        (assoc state :done true)))
 
     (await *agnt*)
     ))
 
-(q/sketch
-  :draw (fn []
-          (q/do-record (q/create-graphics 750 750 :svg "test.svg")
-                       (q/no-loop)
-                       (get-drawn-maze {:maze-size 32 :mask [] :width 750 :height 750})
-                       )
-          (q/exit)
-          ))
+;(q/sketch
+;  :draw (fn []
+;          (q/do-record (q/create-graphics 750 750 :svg "test.svg")
+;                       (q/no-loop)
+;                       (get-drawn-maze {:maze-size 32 :mask [] :width 750 :height 750})
+;                       )
+;          (q/exit)
+;          ))
