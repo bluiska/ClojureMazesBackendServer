@@ -8,9 +8,9 @@
     (if (number? n) n nil)))
 
 (defn getImageArrayFromString
-  [mask]
+  [mask size]
   (let [maskString mask]
-    (vec (map #(vec %) (partition 32 (mapv #(if (= 255 (str->int (first %))) 1 0) (partition 4 (str/split maskString #","))))))))
+    (vec (map #(vec %) (partition size (mapv #(if (= 255 (str->int (first %))) 1 0) (partition 4 (str/split maskString #","))))))))
 
 (def cell {:north 0 :east 0 :south 0 :west 0 :visited 0})
 
@@ -34,9 +34,10 @@
     (assoc-in [0 0] (assoc ((maze 0) 0) :visited 1 :weight 0))))
 
 (defn init-maze-for-solving
-  [maze]
+  [r c maze]
   (->
-    (into [] (map #(vec (map (fn [cell] (assoc cell :path 0 :visited 0)) %)) maze))))
+    (into [] (map #(vec (map (fn [cell] (assoc cell :path 0)) %)) maze))
+    (assoc-in [r c] (assoc ((maze r) c) :path 1))))
 
 ;Generates a rectangular maze.
 (defn rectangle-maze
@@ -77,7 +78,7 @@
 
 (defn reset-visited
   [maze]
-  (into [] (map #(vec (map (fn [cell] (assoc cell :visited 1)) %)) maze)))
+  (into [] (map #(vec (map (fn [cell] (when (= 1 (cell :path)) (assoc cell :visited 1))) %)) maze)))
 
 (defn visit-cell
   [r c grid]
@@ -125,9 +126,9 @@
 
 (defn find-route
   [start-row start-col finish-row finish-col weighted-maze]
-  (loop [r finish-row c finish-col maze (init-maze-for-solving weighted-maze)]
+  (loop [r finish-row c finish-col maze (init-maze-for-solving finish-row finish-col weighted-maze)]
     (cond
-      (= 1 ((get-in maze [start-row start-col]) :path)) (reset-visited maze)
+      (= 1 ((get-in maze [start-row start-col]) :path)) maze
       :else
       (let [lowest-weight (first (filter #(solver-valid-lower-weight-cell? % r c (+ r (Direction_R %)) (+ c (Direction_C %)) maze) sides))
             link-r (+ r (Direction_R lowest-weight))
@@ -142,7 +143,7 @@
 
 (defn get-drawn-maze
   [maze-to-draw mask]
-  (let [maze maze-to-draw margin 70]
+  (let [maze maze-to-draw margin 20]
     (q/fill 0)
     (q/background 240)
     (q/line margin margin (- 750 margin) margin)
@@ -188,21 +189,21 @@
                 (when (> 14 (count maze)) (q/text (str (cell :weight)) (+ xv (/ x-cell-size 2)) (+ yv (/ y-cell-size 2))))))))))))
 
 (defn generate-maze
-  [size mask]
-  (dijkstras mask (make-maze size size (getImageArrayFromString mask))))
+  [size mask maskSize]
+  (dijkstras mask (make-maze size size (getImageArrayFromString mask maskSize))))
 
 (defn create-maze-file
   "maze: the 2D matrix of the maze cells
    size: int (preferable up to 32 as the algorithm I have causes a stack overflow
    mask: string (the 2d array of values where 1 will be the mask and 0 is ignored"
-  [maze mask]
+  [maze mask maskSize]
   (let [*agnt* (agent {})]
     (send-off *agnt* (fn [state]
                        (q/sketch
                          :draw (fn []
                                  (q/do-record (q/create-graphics 750 750 :svg "test.svg")
                                               (q/no-loop)
-                                              (get-drawn-maze maze (getImageArrayFromString mask)))
+                                              (get-drawn-maze maze (getImageArrayFromString mask maskSize)))
                                  (q/exit)
                                  ))
                        (assoc state :done true)))

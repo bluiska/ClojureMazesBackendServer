@@ -13,28 +13,32 @@
 
 (def tables {
              :mazes {:name "mazes" :id-col "maze_id"}
-             :weighted_mazes {:name "weighted_mazes" :id-col "weighted_maze_id"}
-             :maze_solutions {:name "maze_solutions" :id-col "maze_solution_id"}
              })
 
 ;Insert a new maze into the database and return the ID of it.
 (defn insert-new-maze
-  "width: int
-   height: int
+  "size: int
+   name: string
    json: json stringified already
    svg: string svg xml"
-  [width height json svg]
+  [size name json svg]
+  ;(let
+  ;  [success (jdbc/execute! db-spec
+  ;                          [(str "INSERT INTO mazes (size, name, json, svg)
+  ;                            VALUES ('" size "','"
+  ;                                      name "','"
+  ;                                      json "','"
+  ;                                      svg "');")]
+  ;                          )]
+  ;  (if success (conj {:success true} (first (jdbc/query db-spec ["SELECT TOP 1 maze_id FROM mazes ORDER BY maze_id DESC"])))
+  ;              {:success false :data {:maze-id -1}}))
   (let
-    [success (jdbc/execute! db-spec
-                            [(str "INSERT INTO mazes (width, height, json, svg)
-                              VALUES (" width ","
-                                        height ",'"
-                                        json "',"
-                                        (if (empty? svg) "''" (str "'" svg "'"))
-                                     ");")]
+    [success (jdbc/insert! db-spec
+                            "mazes" {:size size :name name :json json :svg svg}
                             )]
-    (if success (conj {:succesds true} (first (jdbc/query db-spec ["SELECT TOP 1 maze_id FROM mazes ORDER BY maze_id DESC"])))
-                {:success false :data {:maze-id -1}})))
+    (if success (conj {:success true} (first (jdbc/query db-spec ["SELECT TOP 1 maze_id FROM mazes ORDER BY maze_id DESC"])))
+                {:success false :data {:maze-id -1}}))
+  )
 
 
 ;Update the svg image string for the given maze
@@ -50,8 +54,6 @@
                                   "WHERE " ((tables table) :id-col) " = " id
                             )])]
     {:success (boolean (first success))}))
-
-(defn )
 
 
 
