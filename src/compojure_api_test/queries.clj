@@ -1,59 +1,45 @@
 (ns compojure-api-test.queries
-  (:require [clojure.java.jdbc :as jdbc]))
+  (:require [clojure.java.jdbc :as jdbc]
+            [clojure.data.json :as json]))
 
-(defn clob-to-string [row]
-  (assoc row :json
-             (with-open [rdr (java.io.BufferedReader. (.getCharacterStream (:json row)))]
-               (apply str (line-seq rdr)))))
+;Function to convert the CLOB format of the maze and the svg to json and string respectively
+(defn retrieve-row-function [row]
+  (->
+    (assoc row :json
+               (json/read-str (with-open [rdr (java.io.BufferedReader. (.getCharacterStream (:json row)))]
+               (apply str (line-seq rdr))) :key-fn keyword))
+    (assoc :svg (with-open [rdr (java.io.BufferedReader. (.getCharacterStream (:svg row)))]
+                  (apply str (line-seq rdr))))))
 
 (def db-spec {:subprotocol "h2"
               :subname "./data/mazes"
               :user "sa"
               :password ""})
 
-(def tables {
-             :mazes {:name "mazes" :id-col "maze_id"}
-             })
-
 ;Insert a new maze into the database and return the ID of it.
+;Used during development
 (defn insert-new-maze
   "size: int
    name: string
    json: json stringified already
    svg: string svg xml"
   [size name json svg]
-  ;(let
-  ;  [success (jdbc/execute! db-spec
-  ;                          [(str "INSERT INTO mazes (size, name, json, svg)
-  ;                            VALUES ('" size "','"
-  ;                                      name "','"
-  ;                                      json "','"
-  ;                                      svg "');")]
-  ;                          )]
-  ;  (if success (conj {:success true} (first (jdbc/query db-spec ["SELECT TOP 1 maze_id FROM mazes ORDER BY maze_id DESC"])))
-  ;              {:success false :data {:maze-id -1}}))
   (let
     [success (jdbc/insert! db-spec
                             "mazes" {:size size :name name :json json :svg svg}
                             )]
-    (if success (conj {:success true} (first (jdbc/query db-spec ["SELECT TOP 1 maze_id FROM mazes ORDER BY maze_id DESC"])))
+    (if success (conj {:success true} (first (jdbc/query db-spec ["SELECT TOP 1 ID FROM mazes ORDER BY ID DESC"])))
                 {:success false :data {:maze-id -1}}))
   )
 
 
-;Update the svg image string for the given maze
-(defn update-maze-svg
-   "table: keyword from table def
-    id: int
-    svg: stringified svg xml"
-  [table id svg]
+;Retrieves all the mazes from the database
+(defn retrieve-all-mazes
+  []
   (let
-    [success (jdbc/execute! db-spec
-                            [(str "UPDATE " ((tables table) :name) " "
-                                  "SET svg = '" svg "' "
-                                  "WHERE " ((tables table) :id-col) " = " id
-                            )])]
-    {:success (boolean (first success))}))
+    [success (jdbc/query db-spec
+                            ["SELECT * FROM MAZES"] {:row-fn retrieve-row-function})]
+    success))
 
 
 

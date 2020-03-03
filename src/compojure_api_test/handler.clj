@@ -10,7 +10,8 @@
             [clojure.java.io :as io]
             [ring.middleware.cors :refer [wrap-cors]]
             [schema.core :as s])
-  (:import (clojure.lang PersistentArrayMap)))
+  (:import (clojure.lang PersistentArrayMap)
+           (com.fasterxml.jackson.databind.jsonFormatVisitors JsonFormatVisitorWithSerializerProvider)))
 
 (s/defschema Maze
   {:size Long
@@ -21,13 +22,25 @@
   (s/both (s/pred vector? "vector")
                [inner-schema]))
 
+(s/defschema MazeJson
+  (Vector (Vector {(s/required-key :north) s/Num
+                   (s/required-key :east) s/Num
+                   (s/required-key :south) s/Num
+                   (s/required-key :west) s/Num
+                   (s/required-key :visited) s/Num
+                   (s/required-key :weight) s/Num
+                   (s/required-key :mask) s/Num})))
+
+(s/defschema StoredMaze
+  {:id Long
+   :name s/Str
+   :size BigDecimal
+   :json MazeJson
+   :svg s/Str})
+
+
 (s/defschema StandardMaze
-  {(s/required-key :svg) s/Str (s/required-key :maze) (Vector (Vector {(s/required-key :north) s/Num
-                      (s/required-key :east) s/Num
-                      (s/required-key :south) s/Num
-                      (s/required-key :west) s/Num
-                      (s/required-key :visited) s/Num
-                      (s/required-key :weight) s/Num}))})
+  {(s/required-key :svg) s/Str (s/required-key :maze) MazeJson})
 
 (s/defschema SolvedMaze
   {:svg s/Str :maze (Vector (Vector {(s/required-key :north) s/Num
@@ -36,6 +49,7 @@
                       (s/required-key :west) s/Num
                       (s/required-key :visited) s/Num
                       (s/required-key :weight) s/Num
+                      (s/required-key :mask) s/Num
                       (s/required-key :path) s/Num}))})
 
 (s/defschema MazeToSolve
@@ -45,9 +59,8 @@
                           (s/required-key :west) s/Num
                           (s/required-key :visited) s/Num
                           (s/required-key :weight) s/Num
+                          (s/required-key :mask) s/Num
                           (s/optional-key :path) s/Num}))
-   :mask s/Str
-   :maskSize Long
    :start-row Long
    :start-col Long
    :goal-row Long
@@ -74,16 +87,17 @@
         (ok {:result (let []
                        (when (.exists (io/as-file "test.svg")) (io/delete-file "test.svg"))
                        (let [generatedMaze (mazegen/generate-maze size "" 1)]
-                         (mazegen/create-maze-file generatedMaze "" 1)
+                         (mazegen/create-maze-file generatedMaze)
                          (while (try (while (empty? (slurp "test.svg")) (slurp "test.svg")) (catch Exception e "")))
                          (Thread/sleep 200)
                          (let [image (slurp "test.svg")]
                            (while (.exists (io/as-file "test.svg"))
                              (try
                                (io/delete-file "test.svg") (catch Exception e)))
-                           ;(queries/insert-new-maze size "Maze in a maze - 32x32" (json/write-str generatedMaze) image)
+                           ;(queries/insert-new-maze size "The G - 32x32" (json/write-str generatedMaze) image)
                            {:svg image :maze generatedMaze})))}))
 
+      ;Creates a new masked maze, renders it and returns it.
       (POST "/new_masked_maze" []
         :return {:result StandardMaze}
         :body [maskedMaze Maze]
@@ -91,20 +105,21 @@
         (ok {:result (let []
                        (when (.exists (io/as-file "test.svg")) (io/delete-file "test.svg"))
                        (let [generatedMaze (mazegen/generate-maze (maskedMaze :size) (maskedMaze :mask) (maskedMaze :maskSize))]
-                         (mazegen/create-maze-file generatedMaze (maskedMaze :mask) (maskedMaze :maskSize))
+                         (mazegen/create-maze-file generatedMaze)
                          (while (try (while (empty? (slurp "test.svg")) (slurp "test.svg")) (catch Exception e "")))
                          (Thread/sleep 200)
                          (let [image (slurp "test.svg")]
                            (while (.exists (io/as-file "test.svg"))
                              (try
                                (io/delete-file "test.svg") (catch Exception e)))
-                           ;(queries/insert-new-maze (maskedMaze :size) "Maze in a maze - 32x32" (json/write-str generatedMaze) image)
+                           ;(queries/insert-new-maze (maskedMaze :size) "Obstacles - 25x25" (json/write-str generatedMaze) image)
                            {:svg image :maze generatedMaze})))})))
 
     ;Solver API - Solves the given mazes
     (context "/solver" []
       :tags ["solver"]
-      :middleware [[wrap-cors :access-control-allow-origin [#"http://localhost:8100"] :access-control-allow-methods [:get :put :post :delete]]]
+      :middleware [[wrap-cors :access-control-allow-origin [#"http://localhost:8100"] :access-control-allow-methods [:get :put :post :delete]]
+                   [wrap-json-response]]
 
       (POST "/solve_maze" []
         :return {:result SolvedMaze}
@@ -113,7 +128,7 @@
         (ok {:result (let []
                        (when (.exists (io/as-file "test.svg")) (io/delete-file "test.svg"))
                        (let [solvedMaze (mazegen/find-route (maze :start-row) (maze :start-col) (maze :goal-row) (maze :goal-col) (maze :maze))]
-                         (mazegen/create-maze-file solvedMaze (maze :mask) (maze :maskSize))
+                         (mazegen/create-maze-file solvedMaze)
                          (while (try (while (empty? (slurp "test.svg")) (slurp "test.svg")) (catch Exception e "")))
                          (Thread/sleep 200)
                          (let [image (slurp "test.svg")]
@@ -121,10 +136,22 @@
                              (try
                                (io/delete-file "test.svg") (catch Exception e)))
                            {:svg image :maze solvedMaze}))
-
                        )})
         )
-      )))
+      )
+    (context "/existing_mazes" []
+      :tags ["existing_mazes"]
+      :middleware [[wrap-cors :access-control-allow-origin [#"http://localhost:8100"] :access-control-allow-methods [:get :put :post :delete]]
+                   [wrap-json-response]]
+
+      (GET "/available_mazes" []
+        :return {:result (Vector StoredMaze)}
+        :query-params []
+        :summary "Returns the available mazes in the database"
+        (ok {:result (vec (queries/retrieve-all-mazes))})
+        )
+      )
+    ))
 
 
 

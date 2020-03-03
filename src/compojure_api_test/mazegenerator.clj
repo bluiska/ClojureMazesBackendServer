@@ -45,25 +45,24 @@
   (vec (take row (repeat (vec (take col (repeat cell)))))))
 
 (defn unvisited-cell?
-  [r c mask grid]
-  (let [cell (get-in grid [r c])
-        maskCell (get (get mask r) c)]
+  [r c grid]
+  (let [cell (get-in grid [r c])]
     (and (= 0 (cell :visited))
-         (if (nil? maskCell) true (= 0 maskCell)))))
+         (if (nil? (cell :mask)) true (= 0 (cell :mask))))))
 
 (defn valid-unvisited-cell?
-  [r c mask grid]
+  [r c grid]
   (and
     (<= 0 r (dec (count grid)))
     (<= 0 c (dec (count (nth grid r))))
-    (unvisited-cell? r c mask grid)))
+    (unvisited-cell? r c grid)))
 
 (defn solver-valid-unvisited-cell?
-  [direction r c mask grid]
+  [direction r c grid]
   (and
     (<= 0 r (dec (count grid)))
     (<= 0 c (dec (count (nth grid r))))
-    (unvisited-cell? r c mask grid)
+    (unvisited-cell? r c grid)
     (= 1 (get (get-in grid [r c]) (nth sides (mod (+ 2 (get sides_backtracker direction)) 4))))
     ))
 
@@ -75,10 +74,6 @@
     (= 1 (get (get-in grid [link-r link-c]) (nth sides (mod (+ 2 (get sides_backtracker direction)) 4))))
     (if-not (nil? ((get-in grid [link-r link-c]) :weight)) (< ((get-in grid [link-r link-c]) :weight) ((get-in grid [r c]) :weight)) false)
     ))
-
-(defn reset-visited
-  [maze]
-  (into [] (map #(vec (map (fn [cell] (when (= 1 (cell :path)) (assoc cell :visited 1))) %)) maze)))
 
 (defn visit-cell
   [r c grid]
@@ -92,33 +87,33 @@
       (assoc-in [cell2_r cell2_c] (assoc ((grid cell2_r) cell2_c) linkKey 1)))))
 
 (defn recursive-backtracking-maze
-  ([current_row current_col mask current_grid]
+  ([current_row current_col current_grid]
    (reduce (fn [grid direction]
              (let [link-r (+ current_row (Direction_R direction))
                    link-c (+ current_col (Direction_C direction))]
-               (if (valid-unvisited-cell? link-r link-c mask grid)
+               (if (valid-unvisited-cell? link-r link-c grid)
                  (->>
                    (visit-cell link-r link-c grid)
                    (join-cells current_row current_col link-r link-c direction)
-                   (recursive-backtracking-maze link-r link-c mask)) grid))) current_grid (shuffle [:north :east :south :west])))
-  ([mask maze] (recursive-backtracking-maze 0 0 mask (init-maze maze)))) ;start at a random point
+                   (recursive-backtracking-maze link-r link-c)) grid))) current_grid (shuffle [:north :east :south :west])))
+  ([maze] (recursive-backtracking-maze 0 0 (init-maze maze)))) ;start at a random point
 
 (defn addWeight
   [r c weight grid]
   (assoc-in grid [r c] (assoc ((grid r) c) :weight weight)))
 
 (defn dijkstras
-  ([current_row current_col mask current_grid]
+  ([current_row current_col current_grid]
    (reduce (fn [grid direction]
              (let [link-r (+ current_row (Direction_R direction))
                    link-c (+ current_col (Direction_C direction))]
-               (if (solver-valid-unvisited-cell? direction link-r link-c mask grid)
+               (if (solver-valid-unvisited-cell? direction link-r link-c grid)
                  (->>
                    (visit-cell link-r link-c grid)
                    (addWeight link-r link-c (inc ((get-in grid [current_row current_col]) :weight)))
-                   (dijkstras link-r link-c mask)) grid))) current_grid (shuffle [:north :east :south :west]))
+                   (dijkstras link-r link-c)) grid))) current_grid (shuffle [:north :east :south :west]))
    )
-  ([mask maze] (dijkstras 0 0 mask (init-maze-for-dijkstas maze))))
+  ([maze] (dijkstras 0 0 (init-maze-for-dijkstas maze))))
 
 (defn addPath
   [r c grid]
@@ -138,11 +133,17 @@
           (recur link-r link-c))
         ))))
 
-(defn make-maze [r c mask]
-  (recursive-backtracking-maze mask (rectangle-maze r c)))
+;Tried using list comprehension however found it easier to work with map-indexed
+(defn add-mask
+  [maze mask]
+  (vec (map-indexed (fn [r row] (vec (map-indexed (fn [c col] (assoc col :mask (if (= 1 (get (get mask r) c)) 1 0))) row))) maze)))
+
+(defn make-maze
+  [r c mask maskSize]
+  (recursive-backtracking-maze (add-mask (rectangle-maze r c) (getImageArrayFromString mask maskSize))))
 
 (defn get-drawn-maze
-  [maze-to-draw mask]
+  [maze-to-draw]
   (let [maze maze-to-draw margin 20]
     (q/fill 0)
     (q/background 240)
@@ -157,7 +158,7 @@
             (let [xv (+ margin (* x x-cell-size))
                   xv2 (+ x-cell-size xv)]
               (let [cell (get-in maze [y x])
-                    maskCell (get (get mask y) x)]
+                    maskCell ((get-in maze [y x]) :mask)]
                 (if (or (nil? maskCell) (= 0 maskCell)) (if (= 0 (cell :visited))
                                                           (do
                                                             (q/fill 200 255 200)
@@ -190,20 +191,20 @@
 
 (defn generate-maze
   [size mask maskSize]
-  (dijkstras mask (make-maze size size (getImageArrayFromString mask maskSize))))
+  (dijkstras (make-maze size size mask maskSize)))
 
 (defn create-maze-file
   "maze: the 2D matrix of the maze cells
    size: int (preferable up to 32 as the algorithm I have causes a stack overflow
    mask: string (the 2d array of values where 1 will be the mask and 0 is ignored"
-  [maze mask maskSize]
+  [maze]
   (let [*agnt* (agent {})]
     (send-off *agnt* (fn [state]
                        (q/sketch
                          :draw (fn []
                                  (q/do-record (q/create-graphics 750 750 :svg "test.svg")
                                               (q/no-loop)
-                                              (get-drawn-maze maze (getImageArrayFromString mask maskSize)))
+                                              (get-drawn-maze maze))
                                  (q/exit)
                                  ))
                        (assoc state :done true)))
