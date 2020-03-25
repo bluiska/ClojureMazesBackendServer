@@ -1,4 +1,4 @@
-(ns compojure-api-test.queries
+(ns clojure-maze-backend.queries
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.data.json :as json]))
 
@@ -11,6 +11,7 @@
     (assoc :svg (with-open [rdr (java.io.BufferedReader. (.getCharacterStream (:svg row)))]
                   (apply str (line-seq rdr))))))
 
+;Database specification
 (def db-spec {:subprotocol "h2"
               :subname "./data/mazes"
               :user "sa"

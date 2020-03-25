@@ -1,24 +1,14 @@
-# compojure-api-test
-
-FIXME
+# clojure-maze-backend
 
 ## Usage
 
 ### Run the application locally
 
-`lein ring server`
+`lein run`
 
-### Packaging and running as standalone jar
+### Accessing Swagger Docs
 
-```
-lein do clean, ring uberjar
-java -jar target/server.jar
-```
+To access the Maze API documentation, after running the project in leiningen, visit:
 
-### Packaging as war
+`http://localhost:3000`
 
-`lein ring uberwar`
-
-## License
-
-Copyright ©  FIXME

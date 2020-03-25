@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/compojure-api-test.iml" filepath="$PROJECT_DIR$/compojure-api-test.iml" />
+      <module fileurl="file://$PROJECT_DIR$/clojure-maze-backend.iml" filepath="$PROJECT_DIR$/clojure-maze-backend.iml" />
     </modules>
   </component>
 </project>

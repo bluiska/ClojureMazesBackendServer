@@ -1,8 +1,8 @@
- (defproject compojure-api-test "0.1.0-SNAPSHOT"
-   :description "FIXME: write description"
+ (defproject clojure-maze-backend "0.1.0-SNAPSHOT"
+   :description "Clojure backend for generating, solving and rendering a maze."
    :dependencies [[org.clojure/clojure "1.10.0"]
                   [metosin/compojure-api "2.0.0-alpha30"]]
-   :ring {:handler compojure-api-test.handler/app}
+   :ring {:handler clojure-maze-backend.handler/app}
    :uberjar-name "server.jar"
    :profiles {:dev {:dependencies [[javax.servlet/javax.servlet-api "3.1.0"]
                                    [org.clojure/data.json "1.0.0"]

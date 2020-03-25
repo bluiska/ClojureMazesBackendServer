@@ -1,12 +1,11 @@
-(ns compojure-api-test.handler
+(ns clojure-maze-backend.handler
   (:require [compojure.api.sweet :refer :all]
             [ring.util.http-response :refer :all]
             [ring.middleware.json :refer [wrap-json-response]]
             [schema.core :as s]
-            [clojure.data.json :as json]
-            [compojure-api-test.mazegenerator :as mazegen]
-            [compojure-api-test.queries :as queries]
-            [juxt.dirwatch :as dirwatch]
+            [clojure-maze-backend.mazegenerator :as mazegen]
+            [clojure-maze-backend.mazesolver :as mazesolve]
+            [clojure-maze-backend.queries :as queries]
             [clojure.java.io :as io]
             [ring.middleware.cors :refer [wrap-cors]]
             [schema.core :as s])
@@ -58,7 +57,7 @@
                           (s/required-key :south) s/Num
                           (s/required-key :west) s/Num
                           (s/required-key :visited) s/Num
-                          (s/required-key :weight) s/Num
+                          (s/optional-key :weight) s/Num
                           (s/required-key :mask) s/Num
                           (s/optional-key :path) s/Num}))
    :start-row Long
@@ -94,6 +93,8 @@
                            (while (.exists (io/as-file "test.svg"))
                              (try
                                (io/delete-file "test.svg") (catch Exception e)))
+
+                           ;To save the generated maze, uncomment the below line and don't forget to change the name
                            ;(queries/insert-new-maze size "The G - 32x32" (json/write-str generatedMaze) image)
                            {:svg image :maze generatedMaze})))}))
 
@@ -112,6 +113,8 @@
                            (while (.exists (io/as-file "test.svg"))
                              (try
                                (io/delete-file "test.svg") (catch Exception e)))
+
+                           ;To save the generated maze, uncomment the below line and don't forget to change the name
                            ;(queries/insert-new-maze (maskedMaze :size) "Obstacles - 25x25" (json/write-str generatedMaze) image)
                            {:svg image :maze generatedMaze})))})))
 
@@ -127,7 +130,7 @@
         :summary "Solves the given maze and returns it as an SVG XML string."
         (ok {:result (let []
                        (when (.exists (io/as-file "test.svg")) (io/delete-file "test.svg"))
-                       (let [solvedMaze (mazegen/find-route (maze :start-row) (maze :start-col) (maze :goal-row) (maze :goal-col) (maze :maze))]
+                       (let [solvedMaze (mazesolve/solve-maze (maze :start-row) (maze :start-col) (maze :goal-row) (maze :goal-col) (maze :maze))]
                          (mazegen/create-maze-file solvedMaze)
                          (while (try (while (empty? (slurp "test.svg")) (slurp "test.svg")) (catch Exception e "")))
                          (Thread/sleep 200)
