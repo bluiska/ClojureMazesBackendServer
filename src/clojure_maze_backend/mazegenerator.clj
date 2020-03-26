@@ -27,7 +27,7 @@
   [row col]
   (vec (take row (repeat (vec (take col (repeat cell)))))))
 
-;Adds boundary checking to the unvisited cell checking to ensure the row and col attampted to be accessed is within bounds.
+;Adds boundary checking to the unvisited cell checking to ensure the row and col attempted to be accessed is within bounds.
 (defn valid-unvisited-cell?
   [r c grid]
   (and
@@ -45,7 +45,7 @@
 
 ;The recursive backtracker algorithm to create the maze
 ;Uses reduce to execute the path branching in every direction at each cell as well as to enabled the manipulation
-;of the grid an an immutable way.
+;of the grid in an immutable way.
 ;The directions are shuffled and for each direction in the array it recurses and executes the same function.
 ;This will result in the algorithm executing the recursive backtracking. However, as this function is not tail recursive,
 ;it runs out of stack space for mazes with sizes over 32 (more like 64 but 32 is a safe number).
@@ -61,7 +61,7 @@
                    (common/visit-cell link-r link-c grid)
                    (join-cells current_row current_col link-r link-c direction)
                    (recursive-backtracking-maze link-r link-c)) grid))) current_grid (shuffle [:north :east :south :west])))
-  ([maze] (recursive-backtracking-maze 0 0 (init-maze maze)))) ;start at a random point
+  ([maze] (recursive-backtracking-maze 0 0 (init-maze maze)))) ;start at 0,0. Haven't implemented starting at random point due to masking
 
 ;Tried using list comprehension however found it easier to work with map-indexed
 ;Adds the mask to the maze by looping through each cell and checking if the corresponding cell is set in the mask
@@ -157,7 +157,7 @@
     (send-off *agnt* (fn [state]
                        (q/sketch
                          :draw (fn []
-                                 (q/do-record (q/create-graphics 750 750 :svg "test.svg")
+                                 (q/do-record (q/create-graphics 750 750 :svg "maze.svg")
                                               (q/no-loop)
                                               (get-drawn-maze maze))
                                  (q/exit)
